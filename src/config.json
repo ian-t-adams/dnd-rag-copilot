@@ -1,0 +1,23 @@
+{
+    "AOAI_CONFIGS": {
+        "EMBEDDINGS_MODEL": "text-embedding-ada-002",
+        "CHAT_MODEL": "gpt-4-32k",
+        "TIKTOKEN_MODEL": "cl100k_base",
+        "TEMPERATURE": 0.75,
+        "TOP_P": 0.95,
+        "STREAMING": "False",
+        "API_TYPE": "azure",
+        "API_VERSION": "2023-08-01-preview"
+    },
+    "COG_SEARCH_CONFIGS": {
+        "INDEX_1": "dnd-rag-index1"
+    },
+    "DOC_INTEL_CONFIGS": {
+        "ANALYSIS_MODEL": "prebuilt-layout"
+    },
+    "BLOB_STORAGE_CONFIGS": {
+        "RAW_CONTAINER": "dnd-rag-bot-raw",
+        "PROCESSED_CONTAINER": "dnd-rag-bot-processed",
+        "FINAL_CONTAINER": "dnd-rag-bot-final"
+    }
+}
