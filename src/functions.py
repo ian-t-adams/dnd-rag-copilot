@@ -1,4 +1,5 @@
 import os
+import json
 from urllib.parse import urlparse
 
 def blob_name_and_url_dict(blob_service_client, container_name) -> dict:
@@ -99,3 +100,28 @@ def doc_intel_pdf(document_analysis_client, doc_intel_model, file_name, blob_url
     except Exception as e:
         print(f'Error: {e}')
         return None
+
+
+def local_file_write(data, text_or_json_flag=str, file_path=str, file_name_with_extension=str) -> None:
+    '''
+    :param raw_result: the raw result from the document intelligence service
+    :param result_dict: the dictionary of results from the document intelligence service
+    param text_or_json_flag: a flag to determine if the file should be written as a text file or a json file
+    :return: None
+    '''
+    try:
+        if text_or_json_flag == 'text':
+            with open(file_path + '/' + file_name_with_extension, 'w', encoding='utf-8') as f:
+                f.write(str(data))
+                print('File successfully written to ' + file_path + '/' + file_name_with_extension)
+        elif text_or_json_flag == 'json':
+            with open(file_path + '/' + file_name_with_extension, 'w') as f:
+                json.dump(data, f)
+                print('File successfully written to ' + file_path + '/' + file_name_with_extension)
+        else:
+            print('''Please specify if you want to write a text or json file by setting the text_or_json_flag parameter to 'json' or 'text'.''')
+
+    except Exception as e:
+        print(e)
+    
+    return None
