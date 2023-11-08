@@ -106,7 +106,7 @@ def local_file_write(data, text_or_json_flag=str, file_path=str, file_name_with_
     '''
     :param raw_result: the raw result from the document intelligence service
     :param result_dict: the dictionary of results from the document intelligence service
-    param text_or_json_flag: a flag to determine if the file should be written as a text file or a json file
+    :param text_or_json_flag: a flag to determine if the file should be written as a text file or a json file
     :return: None
     '''
     try:
@@ -125,3 +125,53 @@ def local_file_write(data, text_or_json_flag=str, file_path=str, file_name_with_
         print(e)
     
     return None
+
+def local_file_read(file_path: str, text_or_json_flag: str):
+    '''
+    :param file_path: the path to the file to read
+    :param text_or_json_flag: a flag to determine if the file is a text file or a json file
+    :return: the contents of the file as either a dictionary or raw text
+    '''
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            if text_or_json_flag == 'text':
+                return f.read()
+            elif text_or_json_flag == 'json':
+                return json.load(f)
+            else:
+                print('''Please specify if you want to read a text or json file by setting the text_or_json_flag parameter to 'json' or 'text'.''')
+                return None
+    except Exception as e:
+        print(e)
+        return None
+
+
+def write_to_blob(object_to_upload, blob_service_client, container_name=str, virtual_directory_name=str, file_name=str, json_dump_flag=bool):
+    '''
+    This function will write a file to a blob storage container; uses json.dumps to convert to json if json_dump_flag is True.
+    :param object_to_upload: The object to upload to the blob storage container
+    :param blob_service_client: The blob service client object; raw_blob_service_client, processed_blob_service_client, or final_blob_service_client in this exercise
+    :param container_name: The name of the container to upload to; raw_container_name, processed_container_name, or final_container_name in this exercise
+    :param virtual_directory_name: The name of the virtual directory to upload to; raw_results or dictionaries in this exercise
+    :param file_name: The name of the file to upload, string format
+    :param json_dump_flag: A boolean flag to indicate if the object should be converted to json before uploading
+    '''
+    blob_name = str(container_name + '/' + virtual_directory_name + '/' + file_name)
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+    print(blob_client) # Only needed for debugging
+    if json_dump_flag == True:
+        try:
+            json_object_to_upload = json.dumps(object_to_upload)
+            blob_client.upload_blob(json_object_to_upload, blob_type="BlockBlob")
+            print(f'Uploaded {file_name} to {blob_name}')
+        except Exception as e:
+            print(f'Error uploading {file_name} to {blob_name} with the following Error: {e}')
+    
+    else:
+        try:
+            str_object_to_upload = str(object_to_upload)
+            blob_client.upload_blob(str_object_to_upload, blob_type="BlockBlob")
+            print(f'Uploaded {file_name} to {blob_name}')
+        except Exception as e:
+            print(f'Error uploading {file_name} to {blob_name} with the following Error: {e}')
+
