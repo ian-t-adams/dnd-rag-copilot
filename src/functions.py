@@ -1,4 +1,5 @@
 import os
+import io
 import json
 from azure.core.exceptions import AzureError
 from azure.storage.blob import BlobClient
