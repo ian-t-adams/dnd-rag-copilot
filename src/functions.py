@@ -1,5 +1,7 @@
 import os
 import json
+from azure.core.exceptions import AzureError
+from azure.storage.blob import BlobClient
 from urllib.parse import urlparse
 
 def blob_name_and_url_dict(blob_service_client, container_name) -> dict:
@@ -175,3 +177,115 @@ def write_to_blob(object_to_upload, blob_service_client, container_name=str, vir
         except Exception as e:
             print(f'Error uploading {file_name} to {blob_name} with the following Error: {e}')
 
+
+def load_blobs_iterator(blob_dict, file_type=None, file_name=None):
+    """
+    Generator function to load blobs from Azure Blob Storage.
+
+    Parameters:
+    blob_dict (dict): A dictionary with blob names as keys and blob URLs as values.
+    file_type (str, optional): The file type to filter blobs by. Only blobs with this file type will be loaded. Defaults to None.
+    file_name (str, optional): The file name to filter blobs by. Only the blob with this file name will be loaded. Defaults to None.
+
+    Yields:
+    str: The content of a blob.
+
+    Example usage:
+    dictionary_of_processed_blobs = fn.blob_name_and_url_dict()
+
+    for blob_content in load_blobs(dictionary_of_processed_blobs):
+        # Now blob_content contains the actual content of a blob
+        # You can process it here
+        print(blob_content)
+    """
+    
+    # Iterate over all blobs in the dictionary
+    for blob_name, blob_url in blob_dict.items():
+        # If a file type is specified, skip blobs that don't match the file type
+        if file_type and not blob_name.endswith(file_type):
+            continue
+        # If a file name is specified, skip blobs that don't match the file name
+        if file_name and blob_name != file_name:
+            continue
+        
+        try:
+            # Create a blob client for the current blob
+            blob_client = BlobClient.from_blob_url(blob_url)
+            # Download the blob's content
+            blob_content = blob_client.download_blob().readall()
+            
+            # Yield the blob's content
+            yield blob_content
+        except AzureError as e:
+            print(f"Failed to download blob: {blob_name}. Error: {e}")
+
+def load_blob(blob_dict, container_name=None, file_type=None, file_name=None):
+    """
+    Load a single blob from a nested dictionary of blob names and URLs.
+
+    Parameters:
+    blob_dict (dict): A nested dictionary where keys are container names, file types, and blob names, and values are blob details.
+    file_type (str, optional): The file type to filter blobs by. Blobs not of this file type will be ignored.
+    file_name (str, optional): A specific blob name to load. If provided, only this blob will be loaded.
+    container_name (str, optional): A specific container name to load blobs from. If provided, only blobs from this container will be loaded.
+
+    Returns:
+    bytes: The content of the blob.
+
+    Example usage:
+    blob_dict = {"container1": {".txt": {"blob1": {"file_name": "blob1", "blob_url": "url1"}}}}
+    load_blob(blob_dict, file_type=".txt", file_name="blob1", container_name="container1")
+
+    .txt
+    blob_content_string = blob_content.decode('utf-8')
+
+    .json
+    
+    """
+
+    # If container_name is provided and it does not exist in the dictionary, return None
+    if container_name and container_name not in blob_dict:
+        print(f'container_name:{container_name} not found in blob_dict')
+        return None
+    # If container_name is provided, iterate over just this container, otherwise over all containers in the dictionary
+    for container_name, container_dict in ([(container_name, blob_dict[container_name])] if container_name else blob_dict.items()):
+        # If file_type is provided and it does not exist in the current container's dictionary, skip this container
+        if file_type and file_type not in container_dict:
+            print(f'file_type:{file_type} not found in container_dict')
+            continue
+        # If file_type is provided, iterate over all blobs in the file_type dictionary, otherwise in the container's dictionary
+        for blob_name, blob_details in (container_dict[file_type] if file_type else container_dict).items():
+            # If file_name is provided and blob_name is not equal to it, skip this blob
+            if file_name and blob_name != file_name:
+                print(f'file_name:{file_name} not found in blob_dict {blob_dict}')
+                continue
+
+            try:
+                # Create a BlobClient for the blob
+                print(f'blob_details:{blob_details}')
+                blob_client = BlobClient.from_blob_url(blob_details['blob_url'])
+                # Download the blob and read all its content
+                blob_content = blob_client.download_blob().readall()
+
+                if file_type == '.json':
+                    # Convert the bytes to a file-like object
+                    blob_file = io.BytesIO(blob_content)
+                    # Load the JSON document from the file
+                    blob_content_obj = json.load(blob_file)
+                    # Return the Python object
+                    return blob_content_obj
+
+                if file_type == '.txt':
+                    # Convert the bytes to a string
+                    blob_content_string = blob_content.decode('utf-8')
+                    # Return the string
+                    return blob_content_string
+
+                # Return the blob content
+                return blob_content
+            except AzureError as e:
+                print(f"Failed to download blob: {e}")
+                return None
+
+    # If no blob was found that matches the criteria, return None
+    return None
