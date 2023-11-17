@@ -1,6 +1,5 @@
-import os
-import io
-import json
+
+import os, io, json, copy
 from azure.core.exceptions import AzureError
 from azure.storage.blob import BlobClient
 from urllib.parse import urlparse
@@ -129,6 +128,7 @@ def local_file_write(data, text_or_json_flag=str, file_path=str, file_name_with_
     
     return None
 
+
 def local_file_read(file_path: str, text_or_json_flag: str):
     '''
     :param file_path: the path to the file to read
@@ -220,6 +220,7 @@ def load_blobs_iterator(blob_dict, file_type=None, file_name=None):
         except AzureError as e:
             print(f"Failed to download blob: {blob_name}. Error: {e}")
 
+
 def load_blob(blob_dict, container_name=None, file_type=None, file_name=None):
     """
     Load a single blob from a nested dictionary of blob names and URLs.
@@ -290,3 +291,130 @@ def load_blob(blob_dict, container_name=None, file_type=None, file_name=None):
 
     # If no blob was found that matches the criteria, return None
     return None
+
+
+def print_keys(data, parent_key='', printed_keys=set()):
+    """
+    Recursively prints all keys in a nested dictionary or list.
+
+    Args:
+        data (dict or list): The data to print keys from.
+        parent_key (str, optional): The parent key to prepend to each key. Defaults to ''.
+        printed_keys (set, optional): The set of already printed keys. Defaults to set().
+
+    Returns:
+        None
+    """
+    # if data is a dictionary
+    if isinstance(data, dict):
+        # iterate over each key-value pair in the dictionary
+        for k, v in data.items():
+            # create the current key by appending the parent key and the current key
+            current_key = f"{parent_key}.{k}" if parent_key else k
+            # if the current key has not been printed before, print it and add it to the printed keys set
+            if current_key not in printed_keys:
+                print(current_key)
+                printed_keys.add(current_key)
+            # recursively call the function with the value of the current key and the current key as the parent key
+            print_keys(v, current_key, printed_keys)
+    # if data is a list
+    elif isinstance(data, list):
+        # iterate over each element in the list
+        for v in data:
+            # recursively call the function with the current element and the parent key
+            print_keys(v, parent_key, printed_keys)
+
+
+def select_keys(original_dict, keys_to_select, current_path=''):
+    """
+    This function selects specific keys from a dictionary, including nested dictionaries and lists of dictionaries.
+    It also keeps track of the path of nested keys in the format 'key1.key2.key3'.
+
+    Parameters:
+    original_dict (dict): The original dictionary from which keys are to be selected.
+    keys_to_select (list): A list of keys that need to be selected from the original dictionary.
+    current_path (str): The current path of nested keys. Default is an empty string.
+
+    Returns:
+    new_dict (dict): A new dictionary containing only the selected keys from the original dictionary.
+    """
+
+    # Initialize a new dictionary to store the selected keys
+    new_dict = {}
+
+    # Iterate over each key-value pair in the original dictionary
+    for key, value in original_dict.items():
+
+        # Construct the new key path
+        new_key_path = current_path + '.' + key if current_path else key
+
+        # If the key or the new key path is in the list of keys to select, add it to the new dictionary
+        if key in keys_to_select or new_key_path in keys_to_select:
+            new_dict[key] = value
+
+        # If the value is a dictionary, recursively call the function for nested keys
+        if isinstance(value, dict):
+            new_dict[key] = select_keys(value, keys_to_select, new_key_path)
+
+        # If the value is a list, iterate over each item in the list
+        elif isinstance(value, list):
+            new_list = []
+
+            # If the item is a dictionary, recursively call the function for nested keys
+            for item in value:
+                if isinstance(item, dict):
+                    new_list.append(select_keys(item, keys_to_select, new_key_path))
+
+            # If the new list is not empty, add it to the new dictionary
+            if new_list:
+                new_dict[key] = new_list
+
+    # Return the new dictionary with the selected keys
+    return new_dict
+
+
+def process_data(data, keys_to_remove):
+    """
+    This function processes a data structure (dictionary or list) and removes specified keys.
+    It also moves 'page_number' from 'bounding_regions' to the parent level for 'tables', 'paragraphs', and 'cells'.
+
+    Parameters:
+    data (dict or list): The original data structure from which keys are to be removed.
+    keys_to_remove (list): A list of keys that need to be removed from the data structure.
+
+    Returns:
+    data (dict or list): The processed data structure with the specified keys removed.
+    """
+
+    # If the data is a dictionary, iterate over each key-value pair
+    if isinstance(data, dict):
+        for key, value in list(data.items()):
+
+            # If the key is in the list of keys to remove, delete it from the dictionary
+            if key in keys_to_remove:
+                del data[key]
+                continue
+
+            # If the key is 'tables', 'paragraphs', or 'cells', process the 'bounding_regions'
+            if key in ['tables', 'paragraphs', 'cells']:
+                for item in value:
+                    if 'bounding_regions' in item:
+                        for region in item['bounding_regions']:
+                            if 'page_number' in region:
+                                # Move 'page_number' from 'bounding_regions' to the parent level
+                                item['page_number'] = region['page_number']
+                        # Delete 'bounding_regions' from the item
+                        del item['bounding_regions']
+
+            # Recursively call the function for nested data structures
+            data[key] = process_data(value, keys_to_remove)
+
+    # If the data is a list, iterate over each item in the list
+    elif isinstance(data, list):
+        for i in range(len(data)):
+            # Recursively call the function for each item in the list
+            data[i] = process_data(data[i], keys_to_remove)
+
+    # Return the processed data structure
+    return data
+
